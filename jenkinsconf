@@ -1,14 +1,23 @@
 pipeline {
-      agent any
-      stages {
-          stage('Check User') {
-              steps {
-                 sh '/usr/bin/ansible --version'
-}
-}
+    agent any // Top-level agent for non-Docker stages (e.g., Checkout SCM)
 
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/rouissi-med/labsoc.git'
+            }
+        }
 
-
-
-}
+        stage('Check Ansible Version') {
+            agent {
+                docker {
+                    image 'ansible/ansible-runner:latest' // Docker image with Ansible pre-installed
+                    args '--user root' // Run as root to avoid permission issues
+                }
+            }
+            steps {
+                sh 'ansible --version'
+            }
+        }
+    }
 }
