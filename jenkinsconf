@@ -6,5 +6,16 @@ pipeline {
                   sh 'whoami'
 }
 }
+
+
+stage('Check PATH') {
+            steps {
+                sh 'echo $PATH'
+}
+}
+
+
+
+
 }
 }
