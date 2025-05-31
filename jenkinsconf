@@ -10,7 +10,7 @@ pipeline {
 
         stage('Check Ansible Version') {
             agent {
-                docker {
+                dockerContainer {
                     image 'ansible/ansible-runner:latest' // Docker image with Ansible pre-installed
                     args '--user root' // Run as root to avoid permission issues
                 }
