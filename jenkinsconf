@@ -3,14 +3,7 @@ pipeline {
       stages {
           stage('Check User') {
               steps {
-                  sh 'whoami'
-}
-}
-
-
-stage('Check PATH') {
-            steps {
-                sh 'echo $PATH'
+                  sh '/usr/bin/ansible --version'
 }
 }
 
