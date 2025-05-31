@@ -12,6 +12,7 @@ pipeline {
             agent {
                 docker {
                     image 'ansible/ansible-runner:latest' // Docker image with Ansible pre-installed
+                    args '--user root'
                     
                 }
             }
