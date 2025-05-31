@@ -3,7 +3,7 @@ pipeline {
       stages {
           stage('Check User') {
               steps {
-                  sh '/usr/bin/ansible --version'
+                  sh 'ls -l /usr/bin/ansible'
 }
 }
 
