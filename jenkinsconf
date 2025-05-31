@@ -1,10 +1,16 @@
 pipeline {
-    agent any // Top-level agent for non-Docker stages (e.g., Checkout SCM)
+    agent any // Top-level agent for non-Docker stages
+
+    options {
+        timestamps() // Add timestamps to console output
+    }
 
     stages {
         stage('Checkout SCM') {
             steps {
+                echo 'Starting SCM checkout'
                 git branch: 'main', url: 'https://github.com/rouissi-med/labsoc.git'
+                echo 'Finished SCM checkout'
             }
         }
 
@@ -12,12 +18,37 @@ pipeline {
             agent {
                 docker {
                     image 'cytopia/ansible:latest' // Docker image with Ansible pre-installed
-                    args '--user root'
-                    
+                    args '--user root' // Run as root to avoid permission issues
                 }
             }
             steps {
-                sh 'ansible --version'
+                sh '''
+                    echo "Starting Check Ansible Version stage"
+                    date
+                    whoami
+                    echo "PATH is: $PATH"
+                    which ansible || echo "Ansible not found"
+                    ansible --version || echo "Failed to run ansible --version"
+                    echo "Finished Check Ansible Version stage"
+                    date
+                '''
+            }
+        }
+
+        stage('Test Connectivity') {
+            agent {
+                docker {
+                    image 'cytopia/ansible:latest' // Docker image with Ansible pre-installed
+                    args '--user root' // Run as root to avoid permission issues
+                }
+            }
+            steps {
+                ansiblePlaybook(
+                    playbook: 'pingtest.yml',
+                    inventory: 'inventory.ini',
+                    credentialsId: 'ansible-ssh-credentials',
+                    extras: '-e "ansible_python_interpreter=/usr/bin/python3" --verbose'
+                )
             }
         }
     }
