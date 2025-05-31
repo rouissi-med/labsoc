@@ -1,5 +1,5 @@
 pipeline {
-  agent {label 'linux'}
+  agent any // Specifies that the pipeline can be run on any available agent
 
   stages {
     stage('Hello') {
