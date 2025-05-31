@@ -1,15 +1,40 @@
 pipeline {
-  agent any // Specifies that the pipeline can be run on any available agent
+    agent any // Top-level agent for non-Docker stages (e.g., Checkout SCM)
 
-  stages {
-    stage('Hello') {
-      steps {
-        sh '''
-          ansible --version
-          ansible-playbook --version
-          ansible-galaxy --version
-        '''
-      }
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/rouissi-med/labsoc.git'
+            }
+        }
+
+        stage('Test Connectivity') {
+    agent {
+        docker {
+            image 'ansible/ansible-runner:latest'
+            args '--user root'
+        }
     }
-  }
+    steps {
+        ansiblePlaybook(
+            playbook: 'test_connectivity.yml',
+            inventory: 'inventory.ini',
+            credentialsId: 'ansible-ssh-credentials',
+            extras: '-e "ansible_python_interpreter=/usr/bin/python3"'
+        )
+    }
+}
+
+        stage('Check Ansible Version') {
+            agent {
+                docker {
+                    image 'ansible/ansible-runner:latest'
+                    args '--user root'
+                }
+            }
+            steps {
+                sh 'ansible --version'
+            }
+        }
+    }
 }
