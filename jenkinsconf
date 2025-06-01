@@ -38,7 +38,7 @@ pipeline {
         stage('Test Connectivity') {
             agent {
                 docker {
-                    image 'cytopia/ansible:latest' // Docker image with Ansible pre-installed
+                    image 'williamyeh/ansible:ubuntu18.04' // Docker image with Ansible pre-installed
                     args '--user root' // Run as root to avoid permission issues
                 }
             }
