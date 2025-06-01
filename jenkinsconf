@@ -45,7 +45,7 @@ pipeline {
             steps {
                 ansiblePlaybook(
                     playbook: 'pingtest.yml',
-                    inventory: 'inventory.yml',
+                    inventory: 'inventory',
                     credentialsId: 'ansible-ssh-credentials',
                     extras: '-e "ansible_python_interpreter=/usr/bin/python3" --verbose'
                 )
