@@ -21,7 +21,7 @@ pipeline {
         stage('Test Connectivity') {
             
             steps {
-                sh 'ansible node1 -m ping'
+                sh 'ansible all -m ping -i inventory.ini'
             }
         }
 
