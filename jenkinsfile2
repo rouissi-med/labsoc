@@ -21,7 +21,12 @@ pipeline {
         stage('Test Connectivity') {
             
             steps {
-                sh 'ansible all -m ping -i inventory.ini'
+                ansiblePlaybook(
+                    playbook: 'pingtest.yml',
+                    inventory: 'inventory.ini',
+                    credentialsId: 'ansible-ssh-identifiant',
+                    extras: '-e "ansible_python_interpreter=/usr/bin/python3" --verbose'
+                )
             }
         }
 
