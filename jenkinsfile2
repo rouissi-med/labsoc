@@ -1,0 +1,20 @@
+pipeline {
+    agent any // Top-level agent for non-Docker stages (e.g., Checkout SCM)
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/rouissi-med/labsoc.git'
+            }
+        }
+
+        
+
+        stage('Check Ansible Version') {
+            
+            steps {
+                sh 'ansible --version'
+            }
+        }
+    }
+}
