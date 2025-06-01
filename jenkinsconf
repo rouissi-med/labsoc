@@ -17,7 +17,7 @@ pipeline {
         stage('Check Ansible Version') {
             agent {
                 docker {
-                    image 'williamyeh/ansible:ubuntu18.04' // Docker image with Ansible pre-installed
+                    image 'cytopia/ansible:2.10' // Docker image with Ansible pre-installed
                     args '--user root' // Run as root to avoid permission issues
                 }
             }
@@ -38,7 +38,7 @@ pipeline {
         stage('Test Connectivity') {
             agent {
                 docker {
-                    image 'williamyeh/ansible:ubuntu18.04' // Docker image with Ansible pre-installed
+                    image 'cytopia/ansible:2.10' // Docker image with Ansible pre-installed
                     args '--user root' // Run as root to avoid permission issues
                 }
             }
