@@ -9,7 +9,6 @@ pipeline {
         }
 
         
-
         stage('Check Ansible Version') {
             
             steps {
@@ -29,8 +28,6 @@ pipeline {
                 )
             }
         }
-
-
 
 
 
