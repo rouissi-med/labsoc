@@ -45,44 +45,74 @@
         state: present
         enablerepo: elasticsearch-9.x
 
+    - name: Ensure Elasticsearch certificate directories exist
+      file:
+        path: /etc/elasticsearch/certs
+        state: directory
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0750'
+
     - name: Configure Elasticsearch for single-node
-      block:
-        - name: Set network.host
-          lineinfile:
-            path: /etc/elasticsearch/elasticsearch.yml
-            regexp: '^network.host'
-            line: 'network.host: 0.0.0.0'
-        - name: Set discovery.type
-          lineinfile:
-            path: /etc/elasticsearch/elasticsearch.yml
-            regexp: '^discovery.type'
-            line: 'discovery.type: single-node'
-        - name: Set cluster name
-          lineinfile:
-            path: /etc/elasticsearch/elasticsearch.yml
-            regexp: '^cluster.name'
-            line: 'cluster.name: my-elk-cluster'
+      copy:
+        dest: /etc/elasticsearch/elasticsearch.yml
+        content: |
+          cluster.name: my-elk-cluster
+          node.name: node1.isi.labsoc.com
+          network.host: 0.0.0.0
+          discovery.type: single-node
+          path.data: /var/lib/elasticsearch
+          path.logs: /var/log/elasticsearch
+          xpack.security.enabled: true
+          xpack.security.enrollment.enabled: true
+          xpack.security.http.ssl.enabled: true
+          xpack.security.http.ssl.keystore.path: certs/http.p12
+          xpack.security.transport.ssl.enabled: true
+          xpack.security.transport.ssl.verification_mode: certificate
+          xpack.security.transport.ssl.keystore.path: certs/transport.p12
+          xpack.security.transport.ssl.truststore.path: certs/transport.p12
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0660'
+
+    - name: Ensure Elasticsearch directories have correct permissions
+      file:
+        path: "{{ item }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0755'
+        state: directory
+      loop:
+        - /var/lib/elasticsearch
+        - /var/log/elasticsearch
 
     - name: Configure JVM options for Elasticsearch
-      lineinfile:
-        path: /etc/elasticsearch/jvm.options
-        regexp: '^-Xms|^-Xmx'
-        line: "{{ item }}"
-      loop:
-        - '-Xms4g'
-        - '-Xmx4g'
+      copy:
+        dest: /etc/elasticsearch/jvm.options.d/heap.options
+        content: |
+          -Xms4g
+          -Xmx4g
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0660'
 
     - name: Start and enable Elasticsearch
       systemd:
         name: elasticsearch
         state: started
         enabled: yes
-      
+      register: elasticsearch_status
+      retries: 3
+      delay: 5
+      until: elasticsearch_status is success
+      failed_when: elasticsearch_status is failed
+
     - name: Wait for Elasticsearch to be available
       uri:
-        url: http://localhost:9200
+        url: https://localhost:9200
         status_code: 200
         return_content: yes
+        validate_certs: no
       register: result
       until: result.status == 200
       retries: 30
