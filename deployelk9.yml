@@ -78,7 +78,7 @@
         state: started
         enabled: yes
       register: elasticsearch_status
-      failed_when: elasticsearch_status.state != 'started'
+      failed_when: elasticsearch_status.status.active != 'active'
 
     - name: Wait for Elasticsearch to be available
       uri:
