@@ -107,16 +107,32 @@
       until: elasticsearch_status is success
       failed_when: elasticsearch_status is failed
 
+    - name: Setup Elasticsearch passwords
+      command: /usr/share/elasticsearch/bin/elasticsearch-setup-passwords auto --batch
+      register: password_setup
+      changed_when: true
+      when: elasticsearch_status is success
+      ignore_errors: true
+
+    - name: Extract elastic user password
+      set_fact:
+        elastic_password: "{{ password_setup.stdout | regex_search('PASSWORD elastic = ([^\n]+)', '\\1') | first }}"
+      when: password_setup is success
+
     - name: Wait for Elasticsearch to be available
       uri:
         url: https://localhost:9200
         status_code: 200
         return_content: yes
         validate_certs: no
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: yes
       register: result
       until: result.status == 200
       retries: 30
       delay: 5
+      when: elastic_password is defined
 
     - name: Install Logstash
       dnf:
