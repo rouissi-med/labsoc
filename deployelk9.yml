@@ -8,12 +8,12 @@
     logstash_version: "9.0.0"
 
   tasks:
-    - name: Install Java (required for ELK)
+    - name: Install Java
       dnf:
         name: java-17-openjdk
         state: present
 
-    - name: Add Elasticsearch 9.x repository
+    - name: Add Elasticsearch repository
       copy:
         dest: /etc/yum.repos.d/elasticsearch.repo
         content: |
@@ -26,14 +26,14 @@
           autorefresh=1
           type=rpm-md
 
-    - name: Set vm.max_map_count for Elasticsearch
+    - name: Set vm.max_map_count
       sysctl:
         name: vm.max_map_count
         value: "262144"
         state: present
         reload: yes
 
-    - name: Set file descriptor limits for Elasticsearch
+    - name: Set file descriptor limits
       lineinfile:
         path: /etc/security/limits.conf
         line: "elasticsearch - nofile 65535"
@@ -45,7 +45,7 @@
         state: present
         enablerepo: elasticsearch-9.x
 
-    - name: Ensure Elasticsearch certificate directories exist
+    - name: Ensure certificate directory exists
       file:
         path: /etc/elasticsearch/certs
         state: directory
@@ -53,7 +53,42 @@
         group: elasticsearch
         mode: '0750'
 
-    - name: Configure Elasticsearch for single-node
+    - name: Check if CA certificate exists
+      stat:
+        path: /etc/elasticsearch/certs/ca.p12
+      register: ca_cert
+
+    - name: Generate CA certificate if not exists
+      command: /usr/share/elasticsearch/bin/elasticsearch-certutil ca --out /etc/elasticsearch/certs/ca.p12 --pass ""
+      when: not ca_cert.stat.exists
+
+    - name: Check if http certificate exists
+      stat:
+        path: /etc/elasticsearch/certs/http.p12
+      register: http_cert
+
+    - name: Generate http certificate if not exists
+      command: /usr/share/elasticsearch/bin/elasticsearch-certutil cert --ca /etc/elasticsearch/certs/ca.p12 --out /etc/elasticsearch/certs/http.p12 --pass ""
+      when: not http_cert.stat.exists
+
+    - name: Check if transport certificate exists
+      stat:
+        path: /etc/elasticsearch/certs/transport.p12
+      register: transport_cert
+
+    - name: Generate transport certificate if not exists
+      command: /usr/share/elasticsearch/bin/elasticsearch-certutil cert --ca /etc/elasticsearch/certs/ca.p12 --out /etc/elasticsearch/certs/transport.p12 --pass ""
+      when: not transport_cert.stat.exists
+
+    - name: Set permissions for certificates
+      file:
+        path: /etc/elasticsearch/certs
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0750'
+        recurse: yes
+
+    - name: Configure Elasticsearch
       copy:
         dest: /etc/elasticsearch/elasticsearch.yml
         content: |
@@ -71,95 +106,25 @@
           xpack.security.transport.ssl.verification_mode: certificate
           xpack.security.transport.ssl.keystore.path: certs/transport.p12
           xpack.security.transport.ssl.truststore.path: certs/transport.p12
+          http.port: 9200
         owner: elasticsearch
         group: elasticsearch
         mode: '0660'
-
-    - name: Ensure Elasticsearch directories have correct permissions
-      file:
-        path: "{{ item }}"
-        owner: elasticsearch
-        group: elasticsearch
-        mode: '0755'
-        state: directory
-      loop:
-        - /var/lib/elasticsearch
-        - /var/log/elasticsearch
-
-    - name: Configure JVM options for Elasticsearch
-      copy:
-        dest: /etc/elasticsearch/jvm.options.d/heap.options
-        content: |
-          -Xms4g
-          -Xmx4g
-        owner: elasticsearch
-        group: elasticsearch
-        mode: '0660'
+      notify: Restart Elasticsearch
 
     - name: Start and enable Elasticsearch
       systemd:
         name: elasticsearch
         state: started
         enabled: yes
-      register: elasticsearch_status
-      retries: 3
-      delay: 5
-      until: elasticsearch_status is success
-      failed_when: elasticsearch_status is failed
 
-    - name: Setup Elasticsearch passwords
+    - name: Check if elastic password is set
+      ansible.builtin.command: curl -k -u elastic:{{ elastic_password | default('changeme') }} https://localhost:9200
+      register: elastic_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Setup Elasticsearch passwords if not set
       command: /usr/share/elasticsearch/bin/elasticsearch-setup-passwords auto --batch
       register: password_setup
       changed_when: true
-      when: elasticsearch_status is success
-      ignore_errors: true
-
-    - name: Extract elastic user password
-      set_fact:
-        elastic_password: "{{ password_setup.stdout | regex_search('PASSWORD elastic = ([^\n]+)', '\\1') | first }}"
-      when: password_setup is success
-
-    - name: Wait for Elasticsearch to be available
-      uri:
-        url: https://localhost:9200
-        status_code: 200
-        return_content: yes
-        validate_certs: no
-        user: elastic
-        password: "{{ elastic_password }}"
-        force_basic_auth: yes
-      register: result
-      until: result.status == 200
-      retries: 30
-      delay: 5
-      when: elastic_password is defined
-
-    - name: Install Logstash
-      dnf:
-        name: logstash-{{ logstash_version }}
-        state: present
-        enablerepo: elasticsearch-9.x
-
-    - name: Start and enable Logstash
-      systemd:
-        name: logstash
-        state: started
-        enabled: yes
-
-    - name: Install Kibana
-      dnf:
-        name: kibana-{{ kibana_version }}
-        state: present
-        enablerepo: elasticsearch-9.x
-
-    - name: Configure Kibana
-      lineinfile:
-        path: /etc/kibana/kibana.yml
-        regexp: '^server.host'
-        line: 'server.host: "0.0.0.0"'
-
-    - name: Start and enable Kibana
-      systemd:
-        name: kibana
-        state: started
-        enabled: yes
