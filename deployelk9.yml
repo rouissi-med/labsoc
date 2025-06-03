@@ -61,6 +61,7 @@
     - name: Generate CA certificate if not exists
       command: /usr/share/elasticsearch/bin/elasticsearch-certutil ca --out /etc/elasticsearch/certs/ca.p12 --pass ""
       when: not ca_cert.stat.exists
+      changed_when: true
 
     - name: Check if http certificate exists
       stat:
@@ -70,6 +71,7 @@
     - name: Generate http certificate if not exists
       command: /usr/share/elasticsearch/bin/elasticsearch-certutil cert --ca /etc/elasticsearch/certs/ca.p12 --out /etc/elasticsearch/certs/http.p12 --pass ""
       when: not http_cert.stat.exists
+      changed_when: true
 
     - name: Check if transport certificate exists
       stat:
@@ -79,6 +81,7 @@
     - name: Generate transport certificate if not exists
       command: /usr/share/elasticsearch/bin/elasticsearch-certutil cert --ca /etc/elasticsearch/certs/ca.p12 --out /etc/elasticsearch/certs/transport.p12 --pass ""
       when: not transport_cert.stat.exists
+      changed_when: true
 
     - name: Set permissions for certificates
       file:
@@ -86,14 +89,14 @@
         owner: elasticsearch
         group: elasticsearch
         mode: '0750'
-        recurse: yes
+        recurse: true
 
     - name: Configure Elasticsearch
       copy:
         dest: /etc/elasticsearch/elasticsearch.yml
         content: |
           cluster.name: my-elk-cluster
-          node.name: node1.isi.labsoc.com
+          node.name: node1
           network.host: 0.0.0.0
           discovery.type: single-node
           path.data: /var/lib/elasticsearch
@@ -101,25 +104,25 @@
           xpack.security.enabled: true
           xpack.security.enrollment.enabled: true
           xpack.security.http.ssl.enabled: true
-          xpack.security.http.ssl.keystore.path: certs/http.p12
+          xpack.security.http.ssl.keystore.path: certs/server.p12
           xpack.security.transport.ssl.enabled: true
           xpack.security.transport.ssl.verification_mode: certificate
-          xpack.security.transport.ssl.keystore.path: certs/transport.p12
-          xpack.security.transport.ssl.truststore.path: certs/transport.p12
+          xpack.security.transport.ssl.keystore_path: certs/server.p12
+          xpack.security.transport.ssl.truststore_path: certs/server.p12
           http.port: 9200
         owner: elasticsearch
         group: elasticsearch
-        mode: '0660'
-      notify: Restart Elasticsearch
+        mode: '0640'
+      notify: restart_elasticsearch
 
     - name: Start and enable Elasticsearch
       systemd:
         name: elasticsearch
         state: started
-        enabled: yes
+        enabled: true
 
     - name: Check if elastic password is set
-      ansible.builtin.command: curl -k -u elastic:{{ elastic_password | default('changeme') }} https://localhost:9200
+      ansible.builtin.command: curl -k curl -u elastic:{{ elastic_password | default('changeme') }} https://localhost:9200
       register: elastic_check
       ignore_errors: yes
       changed_when: false
@@ -128,3 +131,79 @@
       command: /usr/share/elasticsearch/bin/elasticsearch-setup-passwords auto --batch
       register: password_setup
       changed_when: true
+      when: elastic_check.rc != 0
+
+    - name: Extract elastic user password
+      set_fact:
+        elastic_password: "{{ password_setup.stdout | regex_search('PASSWORD elastic = ([^\n]+)', '\\1') | first }}"
+      when: password_setup is not skipped and password_setup.stdout
+
+    - name: Debug elastic password
+      debug:
+        msg: "Elastic password is set to {{ elastic_password }}"
+      when: elastic_password is defined
+
+    - name: Wait for Elasticsearch to be available
+      uri:
+        url: https://localhost:9200
+        status_code: 200
+        validate_certs: no
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: yes
+      register: result
+      retries: 30
+      delay: 10
+      until: result.status == 200
+      when: elastic_password is defined
+
+    - name: Install Kibana
+      dnf:
+        name: kibana-{{ kibana_version }}
+        state: present
+        enablerepo: elasticsearch-9.x
+
+    - name: Configure Kibana
+      copy:
+        dest: /etc/kibana/kibana.yml
+        content: |
+          server.port: 5601
+          server.host: "0.0.0.0"
+          elasticsearch.hosts: ["https://localhost:9200"]
+          elasticsearch.username: "elastic"
+          elasticsearch.password: "{{ elastic_password }}"
+          elasticsearch.ssl.verificationMode: none
+          pid.file: /run/kibana/kibana.pid
+        owner: kibana
+        group: kibana
+        mode: '0640'
+      notify: restart_kibana
+
+    - name: Start and enable Kibana
+      systemd:
+        name: kibana
+        state: started
+        enabled: true
+
+    - name: Install Logstash
+      dnf:
+        name: logstash-{{ logstash_version }}
+        state: present
+        enablerepo: elasticsearch-9.x
+
+    - name: Start and enable Logstash
+      systemd:
+        name: logstash
+        state: started
+        enabled: true
+
+  handlers:
+    - name: restart_elasticsearch
+      systemd:
+        name: elasticsearch
+        state: restarted
+
+    - name: restart_kibana
+      systemd:
+        name: kibana
+        state: restarted
