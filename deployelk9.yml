@@ -77,9 +77,7 @@
         name: elasticsearch
         state: started
         enabled: yes
-      register: elasticsearch_status
-      failed_when: elasticsearch_status.status.active != 'active'
-
+      
     - name: Wait for Elasticsearch to be available
       uri:
         url: http://localhost:9200
