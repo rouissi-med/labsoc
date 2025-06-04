@@ -119,7 +119,7 @@
       systemd:
         name: elasticsearch
         state: started
-        enabled: true
+        enabled: yes
 
     - name: Check if elastic password is set
       ansible.builtin.command: curl -k curl -u elastic:{{ elastic_password | default('changeme') }} https://localhost:9200
@@ -183,7 +183,7 @@
       systemd:
         name: kibana
         state: started
-        enabled: true
+        enabled: yes
 
     - name: Install Logstash
       dnf:
@@ -195,7 +195,7 @@
       systemd:
         name: logstash
         state: started
-        enabled: true
+        enabled: yes
 
   handlers:
     - name: restart_elasticsearch
