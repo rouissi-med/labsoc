@@ -107,8 +107,8 @@
           xpack.security.http.ssl.keystore.path: certs/server.p12
           xpack.security.transport.ssl.enabled: true
           xpack.security.transport.ssl.verification_mode: certificate
-          xpack.security.transport.ssl.keystore_path: certs/server.p12
-          xpack.security.transport.ssl.truststore_path: certs/server.p12
+          xpack.security.transport.ssl.keystore.path: certs/transport.p12
+          xpack.security.transport.ssl.truststore.path: certs/transport.p12
           http.port: 9200
         owner: elasticsearch
         group: elasticsearch
